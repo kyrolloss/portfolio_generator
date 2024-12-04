@@ -1,0 +1,213 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:portfolio_generator/Home/View%20Model/home_cubit.dart';
+import 'package:printing/printing.dart';
+
+import 'Home/View/Home View/Home View.dart';
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => HomeCubit()),
+        ],
+        child: MaterialApp(
+          home: PortfolioScreen(),
+          debugShowCheckedModeBanner: false,
+        ));
+  }
+}
+
+class PortfolioPage extends StatefulWidget {
+  @override
+  _PortfolioPageState createState() => _PortfolioPageState();
+}
+
+class _PortfolioPageState extends State<PortfolioPage> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController jobTitleController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController linkedInController = TextEditingController();
+  final TextEditingController profileController = TextEditingController();
+  final TextEditingController projectController = TextEditingController();
+  final TextEditingController skillController = TextEditingController();
+
+  List<Map<String, String>> experiences = [];
+  List<String> skills = [];
+  Color selectedColor = Colors.blue;
+
+  void generatePdf() async {
+    final pdf = pw.Document();
+
+    // Load fonts asynchronously
+    final amiriFont = await PdfGoogleFonts.amiriRegular();
+    final robotoFont = await PdfGoogleFonts.robotoRegular();
+    final robotoBoldFont = await PdfGoogleFonts.robotoBold();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          margin: pw.EdgeInsets.all(32),
+          theme: pw.ThemeData.withFont(
+            base: robotoFont,
+            bold: robotoBoldFont,
+          ),
+        ),
+        build: (pw.Context context) => [
+          pw.Header(
+            level: 0,
+            child: pw.Text('Portfolio',
+                style: pw.TextStyle(color: PdfColors.black, fontSize: 20)),
+          ),
+          pw.Paragraph(
+            text: "الاسم: ${nameController.text}",
+            style: pw.TextStyle(
+                font: amiriFont, fontSize: 14), // Use the Amiri font here
+          ),
+          pw.Paragraph(text: "Job Title: ${jobTitleController.text}"),
+          pw.Paragraph(text: "Email: ${emailController.text}"),
+          pw.Paragraph(text: "Phone: ${phoneController.text}"),
+          pw.Paragraph(text: "LinkedIn: ${linkedInController.text}"),
+          pw.Header(level: 1, text: 'Profile'),
+          pw.Paragraph(text: profileController.text),
+          if (experiences.isNotEmpty) ...[
+            pw.Header(level: 1, text: 'Work Experience'),
+            ...experiences.map((exp) =>
+                pw.Bullet(text: "${exp['role']} (${exp['duration']})")),
+          ],
+          if (skills.isNotEmpty) ...[
+            pw.Header(level: 1, text: 'Skills'),
+            ...skills.map((skill) => pw.Bullet(text: skill)),
+          ],
+        ],
+      ),
+    );
+
+    await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save());
+  }
+
+  void addExperience() {
+    TextEditingController roleController = TextEditingController();
+    String duration = "";
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Work Experience'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: roleController,
+              decoration: InputDecoration(labelText: 'Role'),
+            ),
+            TextButton(
+              onPressed: () {
+                DatePicker.showDatePicker(
+                  context,
+                  showTitleActions: true,
+                  onConfirm: (date) {
+                    duration = "${date.year}-${date.month}-${date.day}";
+                  },
+                  currentTime: DateTime.now(),
+                  locale: LocaleType.en,
+                );
+              },
+              child: Text('Select Date'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                experiences
+                    .add({'role': roleController.text, 'duration': duration});
+              });
+              Navigator.pop(context);
+            },
+            child: Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void addSkill() {
+    if (skillController.text.isNotEmpty) {
+      setState(() {
+        skills.add(skillController.text);
+        skillController.clear();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Portfolio Generator'),
+        backgroundColor: selectedColor,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            TextField(
+                controller: nameController,
+                decoration: InputDecoration(labelText: 'Name (عربي)')),
+            TextField(
+                controller: jobTitleController,
+                decoration: InputDecoration(labelText: 'Job Title')),
+            TextField(
+                controller: emailController,
+                decoration: InputDecoration(labelText: 'Email')),
+            TextField(
+                controller: phoneController,
+                decoration: InputDecoration(labelText: 'Phone Number')),
+            TextField(
+                controller: linkedInController,
+                decoration: InputDecoration(labelText: 'LinkedIn Profile')),
+            TextField(
+                controller: profileController,
+                decoration: InputDecoration(labelText: 'Profile (عربي)')),
+            Divider(),
+            TextButton(
+              onPressed: addExperience,
+              child: Text(
+                'Add Work Experience',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+            TextField(
+              controller: skillController,
+              decoration: InputDecoration(labelText: 'Add Skill'),
+              onSubmitted: (_) => addSkill(),
+            ),
+            ElevatedButton(onPressed: generatePdf, child: Text('Generate PDF')),
+            Divider(),
+            DropdownButton<Color>(
+              value: selectedColor,
+              items: [
+                DropdownMenuItem(value: Colors.blue, child: Text('Blue')),
+                DropdownMenuItem(value: Colors.red, child: Text('Red')),
+                DropdownMenuItem(value: Colors.green, child: Text('Green')),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => selectedColor = value);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
